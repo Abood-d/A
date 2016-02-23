@@ -11,25 +11,24 @@ import android.hardware.Camera;
 import android.media.CamcorderProfile;
 import android.media.MediaRecorder;
 import android.os.AsyncTask;
+import android.os.Binder;
 import android.os.Build;
 import android.os.Environment;
 import android.os.IBinder;
-import android.text.format.DateFormat;
 import android.util.Log;
 import android.view.Gravity;
-import android.view.SurfaceHolder;
-import android.view.SurfaceView;
 import android.view.TextureView;
 import android.view.WindowManager;
 
 import com.example.android.common.media.CameraHelper;
 
+import java.io.File;
+import java.io.FileDescriptor;
 import java.io.IOException;
-import java.util.Date;
 import java.util.List;
 
 /**
- * Created by ulysses on 22.02.16.
+ * Created by Artem Pelenitsyn on 22.02.16.
  */
 public class MainService extends Service implements TextureView.SurfaceTextureListener {
 
@@ -40,16 +39,17 @@ public class MainService extends Service implements TextureView.SurfaceTextureLi
     private Camera mCamera = null;
     private TextureView mPreview;
     private MediaRecorder mMediaRecorder = null;
+    private FileDescriptor outputFileDescriptor = null;
 
+    private boolean isSurfaceCreated = false;
 
-
-        @Override
+    @Override
     public void onCreate() {
         Log.d(TAG, "START Creating Background Recorder Service");
         // Start foreground service to avoid unexpected kill
         Notification notification = new Notification.Builder(this)
                 .setContentTitle("Background Video Recorder")
-                .setContentText("")
+                .setContentText("Background Video Recorder")
                 .setSmallIcon(R.drawable.ic_launcher)
                 .build();
         startForeground(1234, notification);
@@ -57,55 +57,29 @@ public class MainService extends Service implements TextureView.SurfaceTextureLi
         windowManager = (WindowManager) this.getSystemService(Context.WINDOW_SERVICE);
         mPreview = new TextureView(this);
         WindowManager.LayoutParams layoutParams = new WindowManager.LayoutParams(
-                1024, 576,
+                768, 432, //1024, 576,
                 WindowManager.LayoutParams.TYPE_SYSTEM_OVERLAY,
                 WindowManager.LayoutParams.FLAG_WATCH_OUTSIDE_TOUCH,
                 PixelFormat.TRANSLUCENT
         );
-        layoutParams.gravity = Gravity.CENTER | Gravity.TOP;
+        layoutParams.gravity = Gravity.CENTER_HORIZONTAL | Gravity.CENTER_VERTICAL;
         windowManager.addView(mPreview, layoutParams);
         mPreview.setSurfaceTextureListener(this);
         Log.d(TAG, "FINISH Creating Background Recorder Service");
-    }
-
-    @Override
-    public int onStartCommand(Intent intent, int flags, int startId) {
-        int res = super.onStartCommand(intent, flags, startId);
-        Log.d(TAG, "onStartCommand (empty)");
-        return res;
     }
 
     // Method called right after Surface created (initializing and starting MediaRecorder)
     @Override
     public void onSurfaceTextureAvailable(SurfaceTexture surface, int width, int height) {
         Log.d(TAG, "START surfaceCreated handler: about to prepare MediaRecorder");
-        //TODO: start media recorder task
         // BEGIN_INCLUDE(prepare_start_media_recorder)
 
-        new MediaPrepareTask().execute(null, null, null);
+        isSurfaceCreated = true;
+        if (outputFileDescriptor != null)
+            new MediaPrepareTask().execute(null, null, null);
 
         Log.d(TAG, "FINISH surfaceCreated handler: MediaRecorder fired");
         // END_INCLUDE(prepare_start_media_recorder)
-
-/*        camera = Camera.open();
-        mediaRecorder = new MediaRecorder();
-        camera.unlock();
-
-        mediaRecorder.setPreviewDisplay(surfaceHolder.getSurface());
-        mediaRecorder.setCamera(camera);
-        mediaRecorder.setAudioSource(MediaRecorder.AudioSource.CAMCORDER);
-        mediaRecorder.setVideoSource(MediaRecorder.VideoSource.CAMERA);
-        mediaRecorder.setProfile(CamcorderProfile.get(CamcorderProfile.QUALITY_HIGH));
-
-        mediaRecorder.setOutputFile(
-                Environment.getExternalStorageDirectory()+"/"+
-                        DateFormat.format("yyyy-MM-dd_kk-mm-ss", new Date().getTime())+
-                        ".mp4"
-        );
-
-        try { mediaRecorder.prepare(); } catch (Exception e) {}
-        mediaRecorder.start();
-*/
     }
 
     @Override
@@ -124,7 +98,7 @@ public class MainService extends Service implements TextureView.SurfaceTextureLi
         // empty so far
     }
 
-    // Stop recording and remove SurfaceView
+    // Stop recording and remove preview
     @Override
     public void onDestroy() {
 
@@ -133,18 +107,17 @@ public class MainService extends Service implements TextureView.SurfaceTextureLi
         if (mMediaRecorder != null) {
             mMediaRecorder.stop();  // stop the recording
             releaseMediaRecorder(); // release the MediaRecorder object
+            outputFileDescriptor = null;
         }
 
         if (mCamera != null) {
             mCamera.lock(); // take camera access back from MediaRecorder
-            // inform the user that recording has stopped
-//        setCaptureButtonText("Capture");
-//        isRecording = false;
             releaseCamera();
         }
         // END_INCLUDE(stop_release_media_recorder)
 
         windowManager.removeView(mPreview);
+        isSurfaceCreated = false;
     }
 
 
@@ -163,9 +136,9 @@ public class MainService extends Service implements TextureView.SurfaceTextureLi
                 mPreview.getWidth(), mPreview.getHeight());
 
         // Use the same size for recording profile.
-        CamcorderProfile profile = CamcorderProfile.get(CamcorderProfile.QUALITY_HIGH);
-        profile.videoFrameWidth = optimalSize.width;
-        profile.videoFrameHeight = optimalSize.height;
+        CamcorderProfile profile = CamcorderProfile.get(CamcorderProfile.QUALITY_1080P);
+        //profile.videoFrameWidth = optimalSize.width;
+        //profile.videoFrameHeight = optimalSize.height;
 
         // likewise for the camera object itself.
         parameters.setPreviewSize(profile.videoFrameWidth, profile.videoFrameHeight);
@@ -196,8 +169,8 @@ public class MainService extends Service implements TextureView.SurfaceTextureLi
         mMediaRecorder.setProfile(profile);
 
         // Step 4: Set output file
-        mMediaRecorder.setOutputFile(CameraHelper.getOutputMediaFile(
-                CameraHelper.MEDIA_TYPE_VIDEO).toString());
+        mMediaRecorder.setOutputFile(outputFileDescriptor);
+
         // END_INCLUDE (configure_media_recorder)
 
         Log.d(TAG, "MediaRecorder successfully configured, now prepare it");
@@ -216,7 +189,6 @@ public class MainService extends Service implements TextureView.SurfaceTextureLi
         }
         return true;
     }
-
 
     /**
      * Asynchronous task for preparing the {@link android.media.MediaRecorder} since it's a long blocking
@@ -242,10 +214,7 @@ public class MainService extends Service implements TextureView.SurfaceTextureLi
 
         @Override
         protected void onPostExecute(Boolean result) {
-            /*if (!result) {
-                MainService.this.finish();
-            }
-            */
+            // dummy so far
         }
     }
 
@@ -254,10 +223,6 @@ public class MainService extends Service implements TextureView.SurfaceTextureLi
             mMediaRecorder.reset();   // clear recorder configuration
             mMediaRecorder.release(); // release the recorder object
             mMediaRecorder = null;
-
-            // Lock camera for later use i.e taking it back from MediaRecorder.
-            // MediaRecorder doesn't need it anymore and we will release it if the activity pauses.
-            // mCamera.lock();
         }
     }
 
@@ -269,8 +234,31 @@ public class MainService extends Service implements TextureView.SurfaceTextureLi
         }
     }
 
-
+    // Communication interface goes below
 
     @Override
-    public IBinder onBind(Intent intent) { return null; }
+    public IBinder onBind(Intent intent) {
+        return mBinder;
+    }
+
+    private LocalBinder mBinder = new LocalBinder();
+
+    public class LocalBinder extends Binder {
+        MainService getService() {
+            // Return this instance of MainService so clients can call public methods
+            return MainService.this;
+        }
+    }
+
+    public void setZoom(int newZoom)
+    {
+        mCamera.startSmoothZoom(newZoom);
+    }
+
+    public void startRecord(FileDescriptor out)
+    {
+        outputFileDescriptor = out;
+        if (isSurfaceCreated)
+            new MediaPrepareTask().execute(null, null, null);
+    }
 }
