@@ -6,9 +6,7 @@ Background Video Recorder
 
 * When phone blocks video record goes on.
 
-* Records in 1080 be default (cf. #1).
-
-* Stores resulting video files in `BgVideoReorder` subdirectory of `DCIM` directory on your SD card (usually `/sdcard/DCIM`, but `/sdcard1/DCIM` if `/sdcard1/` exists).
+* Records in 1080 be default (cf. [#1](https://github.com/ulysses4ever/Background-VideoRecorder/issues/1)).
 
 ## Credits
 
