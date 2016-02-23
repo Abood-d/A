@@ -101,7 +101,7 @@ public class MainService extends Service implements TextureView.SurfaceTextureLi
     // Stop recording and remove preview
     @Override
     public void onDestroy() {
-
+        Log.d(TAG, "About to destroy");
         // BEGIN_INCLUDE(stop_release_media_recorder)
         // stop recording and release camera
         if (mMediaRecorder != null) {
@@ -125,7 +125,11 @@ public class MainService extends Service implements TextureView.SurfaceTextureLi
     private boolean prepareVideoRecorder(){
         Log.d(TAG, "START prepareVideoRecorder");
         // BEGIN_INCLUDE (configure_preview)
-        mCamera = CameraHelper.getDefaultCameraInstance();
+        try {
+            mCamera = CameraHelper.getDefaultCameraInstance();
+        } catch (RuntimeException e) {
+            return false;
+        }
 
         // We need to make sure that our preview and recording video size are supported by the
         // camera. Query camera to find all the sizes and choose the optimal size given the
@@ -238,6 +242,7 @@ public class MainService extends Service implements TextureView.SurfaceTextureLi
 
     @Override
     public IBinder onBind(Intent intent) {
+        Log.d(TAG, "Binding a client");
         return mBinder;
     }
 

@@ -23,6 +23,7 @@ import android.content.Intent;
 import android.content.ServiceConnection;
 import android.net.Uri;
 import android.os.Bundle;
+import android.os.Environment;
 import android.os.IBinder;
 import android.util.Log;
 import android.view.View;
@@ -31,7 +32,9 @@ import android.widget.SeekBar;
 
 import com.example.android.common.media.CameraHelper;
 
+import java.io.File;
 import java.io.FileNotFoundException;
+import java.io.IOException;
 
 /**
  *  This activity uses the camera/camcorder as the A/V source for the {@link android.media.MediaRecorder} API.
@@ -45,6 +48,7 @@ public class MainActivity extends Activity {
     private Button stopButton;
     private SeekBar zoomSeekBar;
     private MainService mService = null;
+    private Intent bgVideoServiceIntent;
     Uri outputFileUri = null;
     private boolean mBound;
 
@@ -54,6 +58,7 @@ public class MainActivity extends Activity {
         @Override
         public void onServiceConnected(ComponentName className,
                                        IBinder service) {
+            Log.d(TAG, "MainService Connected");
             // We've bound to MainService, cast the IBinder and get MainService.LocalBinder instance
             MainService.LocalBinder binder = (MainService.LocalBinder) service;
             mService = binder.getService();
@@ -67,6 +72,7 @@ public class MainActivity extends Activity {
 
         @Override
         public void onServiceDisconnected(ComponentName arg0) {
+            Log.d(TAG, "MainService Disconnected");
             mBound = false;
         }
     };
@@ -104,6 +110,17 @@ public class MainActivity extends Activity {
         Log.d(TAG, "FINISH onCreate");
     }
 
+    @Override
+    protected void onDestroy() {
+        Log.d(TAG, "Destroy");
+        super.onDestroy();
+        if (mBound) {
+            Log.d(TAG, "Request to unbind from service (as we were bounded)");
+            unbindService(mConnection);
+            mBound = false;
+        }
+    }
+
     /**
      * The capture button controls start of recording via separate service.
      */
@@ -122,10 +139,12 @@ public class MainActivity extends Activity {
         //stopService(bgVideoServiceIntent); -- wrodked when we used `started` service instead of bound one
         // Unbind from the service
         if (mBound) {
+            Log.d(TAG, "Request to unbind from service (as we were bounded)");
             unbindService(mConnection);
             mBound = false;
         }
-        Log.d(TAG, "service stopped");
+        Log.d(TAG, "Request stopping service");
+        stopService(new Intent(this, MainService.class));
     }
 
     // You'll SUFFER just to create a file on SD on Android 5, see below
@@ -133,6 +152,7 @@ public class MainActivity extends Activity {
     private static final int WRITE_REQUEST_CODE = 143; // just my favourite number
 
     private void createFile(String fileName) {
+        Log.d(TAG, "Request for file creation");
         String mimeType = "video/mp4";
         Intent intent = new Intent(Intent.ACTION_CREATE_DOCUMENT);
 
@@ -149,6 +169,7 @@ public class MainActivity extends Activity {
     @Override
     public void onActivityResult(int requestCode, int resultCode,
                                  Intent resultData) {
+        Log.d(TAG, "File created callback triggered, we are about to fire up MainService and also bound to it");
 
         // The ACTION_CREATE_DOCUMENT intent was sent with the request code
         // WRITE_REQUEST_CODE. If the request code seen here doesn't match, it's the
@@ -162,9 +183,12 @@ public class MainActivity extends Activity {
             if (resultData != null) {
                 outputFileUri = resultData.getData();
                 Log.d(TAG, "Uri: " + outputFileUri.toString());
-                Intent bgVideoServiceIntent = new Intent(this, MainService.class);
-                Log.d(TAG, "service Intent started");
+                bgVideoServiceIntent = new Intent(this, MainService.class);
+                Log.d(TAG, "about to start service");
+                startService(bgVideoServiceIntent);
+                Log.d(TAG, "service started, now trying to bind to it also");
                 bindService(bgVideoServiceIntent, mConnection, Context.BIND_AUTO_CREATE);
+                Log.d(TAG, "service bounded");
             }
         }
     }
