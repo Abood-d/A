@@ -21,6 +21,7 @@ import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
 import android.content.ServiceConnection;
+import android.media.CamcorderProfile;
 import android.net.Uri;
 import android.os.Bundle;
 import android.os.Environment;
@@ -28,6 +29,7 @@ import android.os.IBinder;
 import android.util.Log;
 import android.view.View;
 import android.widget.Button;
+import android.widget.RadioButton;
 import android.widget.SeekBar;
 
 import com.example.android.common.media.CameraHelper;
@@ -44,11 +46,15 @@ import java.io.IOException;
 public class MainActivity extends Activity {
 
     private static final String TAG = "RecorderActivity";
+
     private Button captureButton;
     private Button stopButton;
     private SeekBar zoomSeekBar;
+
+    private int quality;
+
+
     private MainService mService = null;
-    private Intent bgVideoServiceIntent;
     Uri outputFileUri = null;
     private boolean mBound;
 
@@ -64,7 +70,9 @@ public class MainActivity extends Activity {
             mService = binder.getService();
             mBound = true;
             try {
-                mService.startRecord(getContentResolver().openFileDescriptor(outputFileUri, "w").getFileDescriptor());
+                mService.startRecord(
+                        getContentResolver().openFileDescriptor(outputFileUri, "w").getFileDescriptor(),
+                        quality);
             } catch (FileNotFoundException e) {
                 Log.e(TAG, "Record not started because of file-related problem: \n" + e.getStackTrace());
             }
@@ -82,6 +90,10 @@ public class MainActivity extends Activity {
         Log.d(TAG, "START onCreate");
         super.onCreate(savedInstanceState);
         setContentView(R.layout.sample_main);
+
+        // default quality
+        ((RadioButton)findViewById(R.id.q1080)).setChecked(true);
+        quality = CamcorderProfile.QUALITY_1080P;
 
         captureButton = (Button) findViewById(R.id.button_capture);
         stopButton    = (Button) findViewById(R.id.button_stop);
@@ -147,6 +159,30 @@ public class MainActivity extends Activity {
         stopService(new Intent(this, MainService.class));
     }
 
+    public void onRadioButtonClicked(View view) {
+        // Disclaimer: this implementation seems ugly to me and I know 1000 and 1 way to improve the algo
+        //             BUT I get it from official man and afraid to touch it.
+
+        // Is the button now checked?
+        boolean checked = ((RadioButton) view).isChecked();
+
+        // Check which radio button was clicked
+        switch(view.getId()) {
+            case R.id.q1080:
+                if (checked)
+                    quality = CamcorderProfile.QUALITY_1080P;
+                    break;
+            case R.id.q720:
+                if (checked)
+                    quality = CamcorderProfile.QUALITY_720P;
+                    break;
+            case R.id.q480:
+                if (checked)
+                    quality = CamcorderProfile.QUALITY_480P;
+                    break;
+        }
+    }
+
     // You'll SUFFER just to create a file on SD on Android 5, see below
 
     private static final int WRITE_REQUEST_CODE = 143; // just my favourite number
@@ -183,7 +219,7 @@ public class MainActivity extends Activity {
             if (resultData != null) {
                 outputFileUri = resultData.getData();
                 Log.d(TAG, "Uri: " + outputFileUri.toString());
-                bgVideoServiceIntent = new Intent(this, MainService.class);
+                Intent bgVideoServiceIntent = new Intent(this, MainService.class);
                 Log.d(TAG, "about to start service");
                 startService(bgVideoServiceIntent);
                 Log.d(TAG, "service started, now trying to bind to it also");

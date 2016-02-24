@@ -40,6 +40,7 @@ public class MainService extends Service implements TextureView.SurfaceTextureLi
     private TextureView mPreview;
     private MediaRecorder mMediaRecorder = null;
     private FileDescriptor outputFileDescriptor = null;
+    private int quality;
 
     private boolean isSurfaceCreated = false;
 
@@ -140,7 +141,7 @@ public class MainService extends Service implements TextureView.SurfaceTextureLi
                 mPreview.getWidth(), mPreview.getHeight());
 
         // Use the same size for recording profile.
-        CamcorderProfile profile = CamcorderProfile.get(CamcorderProfile.QUALITY_1080P);
+        CamcorderProfile profile = CamcorderProfile.get(quality);
         //profile.videoFrameWidth = optimalSize.width;
         //profile.videoFrameHeight = optimalSize.height;
 
@@ -260,9 +261,10 @@ public class MainService extends Service implements TextureView.SurfaceTextureLi
         mCamera.startSmoothZoom(newZoom);
     }
 
-    public void startRecord(FileDescriptor out)
+    public void startRecord(FileDescriptor out, int desiredQuality)
     {
         outputFileDescriptor = out;
+        quality = desiredQuality;
         if (isSurfaceCreated)
             new MediaPrepareTask().execute(null, null, null);
     }

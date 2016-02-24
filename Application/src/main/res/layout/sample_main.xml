@@ -40,7 +40,8 @@
             android:layout_toStartOf="@id/button_stop"
             android:layout_centerHorizontal="true"
             android:layout_alignTop="@+id/button_capture"
-            android:layout_alignParentBottom="true" />
+            android:layout_alignParentBottom="true"
+            android:maxHeight="1000dp" />
 
         <Button
             android:layout_width="wrap_content"
@@ -53,6 +54,27 @@
             android:layout_alignParentBottom="true"
             android:layout_alignParentRight="true" />
 
+        <RadioGroup xmlns:android="http://schemas.android.com/apk/res/android"
+            android:layout_width="fill_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical">
+            <RadioButton android:id="@+id/q1080"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="1080"
+                android:onClick="onRadioButtonClicked"
+                android:checked="true" />
+            <RadioButton android:id="@+id/q720"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="720"
+                android:onClick="onRadioButtonClicked"/>
+            <RadioButton android:id="@+id/q480"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="480"
+                android:onClick="onRadioButtonClicked"/>
+        </RadioGroup>
     </RelativeLayout>
 
 </FrameLayout>
