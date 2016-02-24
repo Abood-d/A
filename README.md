@@ -6,7 +6,9 @@ Background Video Recorder
 
 * When phone blocks video record goes on.
 
-* Records in 1080 be default (cf. [#1](https://github.com/ulysses4ever/Background-VideoRecorder/issues/1)).
+* Duration is limited only by your SD card volume and your battery charge.
+
+* Records in either 1080p or lower (720, 480).
 
 ## Credits
 
