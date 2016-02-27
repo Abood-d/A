@@ -13,16 +13,16 @@ import android.media.MediaRecorder;
 import android.os.AsyncTask;
 import android.os.Binder;
 import android.os.Build;
-import android.os.Environment;
 import android.os.IBinder;
 import android.util.Log;
 import android.view.Gravity;
 import android.view.TextureView;
+import android.view.View;
+import android.view.ViewGroup;
 import android.view.WindowManager;
 
 import com.example.android.common.media.CameraHelper;
 
-import java.io.File;
 import java.io.FileDescriptor;
 import java.io.IOException;
 import java.util.List;
@@ -43,6 +43,10 @@ public class MainService extends Service implements TextureView.SurfaceTextureLi
     private int quality;
 
     private boolean isSurfaceCreated = false;
+    private ViewGroup.LayoutParams previewLayout;
+    private WindowManager.LayoutParams layoutParams;
+
+    // ***** Lifecycle methods *****
 
     @Override
     public void onCreate() {
@@ -57,8 +61,9 @@ public class MainService extends Service implements TextureView.SurfaceTextureLi
 
         windowManager = (WindowManager) this.getSystemService(Context.WINDOW_SERVICE);
         mPreview = new TextureView(this);
-        WindowManager.LayoutParams layoutParams = new WindowManager.LayoutParams(
-                768, 432, //1024, 576,
+        hidePreview();
+        layoutParams = new WindowManager.LayoutParams(
+                768, 432,
                 WindowManager.LayoutParams.TYPE_SYSTEM_OVERLAY,
                 WindowManager.LayoutParams.FLAG_WATCH_OUTSIDE_TOUCH,
                 PixelFormat.TRANSLUCENT
@@ -68,6 +73,18 @@ public class MainService extends Service implements TextureView.SurfaceTextureLi
         mPreview.setSurfaceTextureListener(this);
         Log.d(TAG, "FINISH Creating Background Recorder Service");
     }
+
+    // Stop recording and remove preview
+    @Override
+    public void onDestroy() {
+        Log.d(TAG, "About to destroy");
+        stopRecord();
+
+        windowManager.removeView(mPreview);
+        isSurfaceCreated = false;
+    }
+
+    // ***** SurfaceTextureListener methods *****
 
     // Method called right after Surface created (initializing and starting MediaRecorder)
     @Override
@@ -99,10 +116,7 @@ public class MainService extends Service implements TextureView.SurfaceTextureLi
         // empty so far
     }
 
-    // Stop recording and remove preview
-    @Override
-    public void onDestroy() {
-        Log.d(TAG, "About to destroy");
+    public void stopRecord() {
         // BEGIN_INCLUDE(stop_release_media_recorder)
         // stop recording and release camera
         if (mMediaRecorder != null) {
@@ -116,11 +130,7 @@ public class MainService extends Service implements TextureView.SurfaceTextureLi
             releaseCamera();
         }
         // END_INCLUDE(stop_release_media_recorder)
-
-        windowManager.removeView(mPreview);
-        isSurfaceCreated = false;
     }
-
 
     @TargetApi(Build.VERSION_CODES.HONEYCOMB)
     private boolean prepareVideoRecorder(){
@@ -244,7 +254,15 @@ public class MainService extends Service implements TextureView.SurfaceTextureLi
     @Override
     public IBinder onBind(Intent intent) {
         Log.d(TAG, "Binding a client");
+        showPreview();
         return mBinder;
+    }
+
+    @Override
+    public boolean onUnbind(Intent intent) {
+        boolean res = super.onUnbind(intent);
+        hidePreview();
+        return res;
     }
 
     private LocalBinder mBinder = new LocalBinder();
@@ -267,5 +285,25 @@ public class MainService extends Service implements TextureView.SurfaceTextureLi
         quality = desiredQuality;
         if (isSurfaceCreated)
             new MediaPrepareTask().execute(null, null, null);
+    }
+
+    public void showPreview()
+    {
+//        mPreview.setVisibility(View.VISIBLE);
+        Log.d(TAG, "Request for show preview");
+        if (mPreview != null && previewLayout != null) {
+            mPreview.setLayoutParams(previewLayout);
+        }
+    }
+
+    public void hidePreview()
+    {
+        Log.d(TAG, "Request for hide preview");
+//        mPreview.setVisibility(View.INVISIBLE);
+        if (mPreview != null) {
+            previewLayout = mPreview.getLayoutParams();
+            mPreview.layout(1, 1, 1, 1);
+        }
+        Log.d(TAG, "Success on hiding preview");
     }
 }
