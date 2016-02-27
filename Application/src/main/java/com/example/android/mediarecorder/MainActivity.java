@@ -47,16 +47,17 @@ public class MainActivity extends Activity {
 
     private static final String TAG = "RecorderActivity";
 
+    // UI
     private Button captureButton;
     private Button stopButton;
     private SeekBar zoomSeekBar;
 
+    // Record parameters
     private int quality;
 
-
+    // Resources for communication with MainService
     private MainService mService = null;
     Uri outputFileUri = null;
-    private boolean mBound;
 
     /** Defines callbacks for service binding, passed to bindService() */
     private ServiceConnection mConnection = new ServiceConnection() {
@@ -68,11 +69,11 @@ public class MainActivity extends Activity {
             // We've bound to MainService, cast the IBinder and get MainService.LocalBinder instance
             MainService.LocalBinder binder = (MainService.LocalBinder) service;
             mService = binder.getService();
-            mBound = true;
             try {
-                mService.startRecord(
-                        getContentResolver().openFileDescriptor(outputFileUri, "w").getFileDescriptor(),
-                        quality);
+                if (outputFileUri != null)
+                    mService.startRecord(
+                            getContentResolver().openFileDescriptor(outputFileUri, "w").getFileDescriptor(),
+                            quality);
             } catch (FileNotFoundException e) {
                 Log.e(TAG, "Record not started because of file-related problem: \n" + e.getStackTrace());
             }
@@ -81,9 +82,11 @@ public class MainActivity extends Activity {
         @Override
         public void onServiceDisconnected(ComponentName arg0) {
             Log.d(TAG, "MainService Disconnected");
-            mBound = false;
+            mService = null;
         }
     };
+
+    // ***** Lifecycle methods *****
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -115,31 +118,57 @@ public class MainActivity extends Activity {
 
             @Override
             public void onStopTrackingTouch(SeekBar seekBar) {
-                if (mBound)
+                if (mService != null)
                     mService.setZoom(progress);
             }
         });
-        Log.d(TAG, "FINISH onCreate");
     }
 
     @Override
     protected void onDestroy() {
         Log.d(TAG, "Destroy");
         super.onDestroy();
-        if (mBound) {
+        if (mService != null) {
             Log.d(TAG, "Request to unbind from service (as we were bounded)");
             unbindService(mConnection);
-            mBound = false;
+            mService = null;
         }
     }
+
+    @Override
+    protected void onResume() {
+        Log.d(TAG, "Resume activity");
+        super.onResume();
+        if (mService != null)
+            mService.showPreview();
+    }
+
+    @Override
+    protected void onPause() {
+        Log.d(TAG, "Pause activity");
+        super.onPause();
+        if (mService != null)
+            mService.hidePreview();
+    }
+
+    // ***** UI callbacks *****
 
     /**
      * The capture button controls start of recording via separate service.
      */
     public void onCaptureClick(View view) {
         Log.d(TAG, "CAPTURE clicked, create output file");
-        //Log.d(TAG, "service Intent created, create a file that would be used by it");
-        createFile(CameraHelper.getOutputMediaFileName());
+
+        // Request for creation of a file
+        Log.d(TAG, "create a file that would be used by it");
+        createFile();
+
+        // start (if not) and bind to service
+        Intent bgVideoServiceIntent = new Intent(this, MainService.class);
+        Log.d(TAG, "about to start service");
+        startService(bgVideoServiceIntent);
+
+        Log.d(TAG, "FINISH onCreate");
     }
 
     /**
@@ -147,15 +176,11 @@ public class MainActivity extends Activity {
      * and storing video file.
      */
     public void onStopClick(View view) {
-        Log.d(TAG, "STOP clicked, stopping service");
+        Log.d(TAG, "STOP clicked, stopping record");
         //stopService(bgVideoServiceIntent); -- wrodked when we used `started` service instead of bound one
-        // Unbind from the service
-        if (mBound) {
-            Log.d(TAG, "Request to unbind from service (as we were bounded)");
-            unbindService(mConnection);
-            mBound = false;
-        }
         Log.d(TAG, "Request stopping service");
+        if (mConnection != null)
+            unbindService(mConnection);
         stopService(new Intent(this, MainService.class));
     }
 
@@ -183,11 +208,14 @@ public class MainActivity extends Activity {
         }
     }
 
+    // ***** File creation handling *****
+
     // You'll SUFFER just to create a file on SD on Android 5, see below
 
     private static final int WRITE_REQUEST_CODE = 143; // just my favourite number
 
-    private void createFile(String fileName) {
+    private void createFile() {
+        String fileName = CameraHelper.getOutputMediaFileName();
         Log.d(TAG, "Request for file creation");
         String mimeType = "video/mp4";
         Intent intent = new Intent(Intent.ACTION_CREATE_DOCUMENT);
@@ -219,12 +247,17 @@ public class MainActivity extends Activity {
             if (resultData != null) {
                 outputFileUri = resultData.getData();
                 Log.d(TAG, "Uri: " + outputFileUri.toString());
-                Intent bgVideoServiceIntent = new Intent(this, MainService.class);
-                Log.d(TAG, "about to start service");
-                startService(bgVideoServiceIntent);
-                Log.d(TAG, "service started, now trying to bind to it also");
-                bindService(bgVideoServiceIntent, mConnection, Context.BIND_AUTO_CREATE);
-                Log.d(TAG, "service bounded");
+
+                if (outputFileUri != null && mService != null)
+                    try {
+                        mService.startRecord(
+                                getContentResolver().openFileDescriptor(outputFileUri, "w").getFileDescriptor(),
+                                quality);
+                    } catch (FileNotFoundException e) {
+                        e.printStackTrace();
+                    }
+                if (mService == null)
+                    bindService(new Intent(this, MainService.class), mConnection, Context.BIND_AUTO_CREATE);
             }
         }
     }
