@@ -142,13 +142,6 @@ public class MainService extends Service implements TextureView.SurfaceTextureLi
             return false;
         }
 
-        mCamera.setZoomChangeListener(new Camera.OnZoomChangeListener() {
-            @Override
-            public void onZoomChange(int zoomValue, boolean stopped, Camera camera) {
-                focus();
-            }
-        });
-
         // We need to make sure that our preview and recording video size are supported by the
         // camera. Query camera to find all the sizes and choose the optimal size given the
         // dimensions of our preview surface.
@@ -165,7 +158,6 @@ public class MainService extends Service implements TextureView.SurfaceTextureLi
         // likewise for the camera object itself.
         parameters.setPreviewSize(profile.videoFrameWidth, profile.videoFrameHeight);
         mCamera.setParameters(parameters);
-        focus();
         try {
             // Requires API level 11+, For backward compatibility use {@link setPreviewDisplay}
             // with {@link SurfaceView}
@@ -293,18 +285,6 @@ public class MainService extends Service implements TextureView.SurfaceTextureLi
         quality = desiredQuality;
         if (isSurfaceCreated)
             new MediaPrepareTask().execute(null, null, null);
-    }
-
-    private Camera.AutoFocusCallback afcb = new Camera.AutoFocusCallback() {
-        @Override
-        public void onAutoFocus(boolean success, Camera camera) {
-            // empty
-        }
-    };
-
-    public void focus()
-    {
-        mCamera.autoFocus(afcb);
     }
 
     public void showPreview()
