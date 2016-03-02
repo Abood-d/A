@@ -147,6 +147,10 @@ public class MainService extends Service implements TextureView.SurfaceTextureLi
 
         // likewise for the camera object itself.
         parameters.setPreviewSize(profile.videoFrameWidth, profile.videoFrameHeight);
+
+        // dreaded auto-focus FOCUS_MODE_CONTINUOUS_VIDEO
+        parameters.setFocusMode(Camera.Parameters.FOCUS_MODE_CONTINUOUS_VIDEO);
+
         mCamera.setParameters(parameters);
         try {
             // Requires API level 11+, For backward compatibility use {@link setPreviewDisplay}
